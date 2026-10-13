@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@source "../"; /* THIS FIXES IT: Forces Tailwind to scan the src directory */
+
+/* 1. Map custom colors to Tailwind v4 theme */
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+@layer base {
+  :root {
+    /* Base */
+    --background: 0 0% 100%;
+    --foreground: 264 80% 16%; 
+
+    /* Primary Accent */
+    --primary: 271 63% 35%; 
+    --primary-foreground: 263 88% 90%; 
+
+    /* Secondary / Muted */
+    --secondary: 268 37% 59%; 
+    --secondary-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 263 88% 90%; 
+    --input: 263 88% 90%; 
+    --ring: 271 63% 35%; 
+    
+    --radius: 0.25rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-changa), sans-serif;
+    font-weight: normal; 
+  }
+}
