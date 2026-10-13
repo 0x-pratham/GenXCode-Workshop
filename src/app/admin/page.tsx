@@ -40,7 +40,9 @@ export default function AdminDashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    async function loadAdminData() {
+    async function fetchAdminData(showLoadingIndicator = true) {
+      if (showLoadingIndicator) setLoading(true)
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return router.push('/login')
 
@@ -83,15 +85,41 @@ export default function AdminDashboard() {
 
       if (sessionData) setActiveSession(sessionData)
 
-      setLoading(false)
+      if (showLoadingIndicator) setLoading(false)
     }
 
-    loadAdminData()
+    // Initial Load
+    fetchAdminData()
+
+    // Real-time Database Subscription
+    const channel = supabase.channel('admin_telemetry_stream')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'check_ins' },
+        () => {
+          // Silently fetch new data without triggering the loading skeleton
+          fetchAdminData(false)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          fetchAdminData(false)
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [router, supabase])
 
   const toggleRole = async (userId: string, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'student' : 'admin'
     
+    // Optimistic Update
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u))
 
     const { error } = await supabase
@@ -165,15 +193,17 @@ export default function AdminDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white border border-border p-6 rounded-sm shadow-sm">
+          <div className="bg-white border border-border p-6 rounded-sm shadow-sm relative overflow-hidden">
             <p className="text-xs text-secondary font-bold uppercase tracking-wider mb-1">Registered Students</p>
             <p className="text-3xl font-black text-foreground">{totalRegistered}</p>
           </div>
-          <div className="bg-white border border-border p-6 rounded-sm shadow-sm">
+          <div className="bg-white border border-border p-6 rounded-sm shadow-sm relative overflow-hidden">
             <p className="text-xs text-secondary font-bold uppercase tracking-wider mb-1">Total Checked In</p>
             <p className="text-3xl font-black text-foreground">{checkIns.length}</p>
+            {/* Live Indicator pulse */}
+            <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
           </div>
-          <div className="bg-white border border-border p-6 rounded-sm shadow-sm">
+          <div className="bg-white border border-border p-6 rounded-sm shadow-sm relative overflow-hidden">
             <p className="text-xs text-secondary font-bold uppercase tracking-wider mb-1">Attendance Rate</p>
             <p className="text-3xl font-black text-foreground">{attendanceRate}%</p>
           </div>
@@ -235,7 +265,6 @@ export default function AdminDashboard() {
                     </tr>
                   ) : (
                     checkIns.map((record) => {
-                      // Parse the UTC timestamp and strictly format it into IST
                       const dateObj = new Date(record.checked_in_at);
                       
                       const timeString = dateObj.toLocaleTimeString('en-IN', { 
