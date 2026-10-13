@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4 font-bold">Student Name</th>
                     <th className="px-6 py-4 font-bold">ID</th>
                     <th className="px-6 py-4 font-bold">Session</th>
-                    <th className="px-6 py-4 font-bold text-right">Time</th>
+                    <th className="px-6 py-4 font-bold text-right">Exact Time (IST)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -234,24 +234,50 @@ export default function AdminDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    checkIns.map((record) => (
-                      <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-foreground">
-                          {record.profiles.full_name}
-                        </td>
-                        <td className="px-6 py-4 text-secondary font-mono text-xs font-medium">
-                          {record.profiles.student_id}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="bg-gray-100 text-secondary px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider border border-border">
-                            {record.sessions.title}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-secondary font-mono text-xs font-medium text-right">
-                          {new Date(record.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                      </tr>
-                    ))
+                    checkIns.map((record) => {
+                      // Parse the UTC timestamp and strictly format it into IST
+                      const dateObj = new Date(record.checked_in_at);
+                      
+                      const timeString = dateObj.toLocaleTimeString('en-IN', { 
+                        timeZone: 'Asia/Kolkata',
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit', 
+                        hour12: true 
+                      });
+                      
+                      const dateString = dateObj.toLocaleDateString('en-IN', { 
+                        timeZone: 'Asia/Kolkata',
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric' 
+                      });
+
+                      return (
+                        <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 font-bold text-foreground">
+                            {record.profiles.full_name}
+                          </td>
+                          <td className="px-6 py-4 text-secondary font-mono text-xs font-medium">
+                            {record.profiles.student_id}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="bg-gray-100 text-secondary px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider border border-border">
+                              {record.sessions.title}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-secondary font-mono text-xs font-medium text-right">
+                            <span className="text-foreground">
+                              {timeString}
+                            </span>
+                            <br />
+                            <span className="text-[10px] text-secondary">
+                              {dateString}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
