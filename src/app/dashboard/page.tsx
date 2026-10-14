@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { QrCode, LogOut, MapPin, Clock, CheckCircle2, Calendar, History, User, Server, Cloud, ShieldCheck, Code, Zap, AlertCircle, Award, Gift, Users } from 'lucide-react'
+import { QrCode, LogOut, MapPin, Clock, CheckCircle2, Calendar, History, User, Server, Cloud, ShieldCheck, Code, Zap, AlertCircle, Award, Gift, Users, Video, Wifi } from 'lucide-react'
 
 // Define types for strict TypeScript safety
 type Profile = {
@@ -19,6 +19,8 @@ type Session = {
   description: string
   start_time: string
   location: string
+  meeting_link?: string
+  is_online_enabled?: boolean
 }
 
 type CheckInHistory = {
@@ -36,71 +38,115 @@ export default function Dashboard() {
   const [history, setHistory] = useState<CheckInHistory[]>([])
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isJoining, setIsJoining] = useState(false)
   
   const supabase = createClient()
   const router = useRouter()
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/login')
-          return
-        }
-
-        // 1. Fetch User Profile Safely
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle()
-        
-        if (userProfile) setProfile(userProfile)
-
-        // 2. Fetch Active Workshop Session Safely
-        const { data: activeSession } = await supabase
-          .from('sessions')
-          .select('*')
-          .order('start_time', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        
-        if (activeSession) {
-          setSession(activeSession)
-          
-          // Check if student is already checked in to the active session
-          const { data: checkInRecord } = await supabase
-            .from('check_ins')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('session_id', activeSession.id)
-            .maybeSingle()
-            
-          if (checkInRecord) setHasCheckedIn(true)
-        }
-
-        // 3. Fetch Attendance History safely
-        const { data: historyData } = await supabase
-          .from('check_ins')
-          .select(`
-            id,
-            checked_in_at,
-            sessions ( title, location )
-          `)
-          .eq('user_id', user.id)
-          .order('checked_in_at', { ascending: false })
-
-        if (historyData) setHistory(historyData as unknown as CheckInHistory[])
-      } catch (error) {
-        console.error("Dashboard sync error:", error)
-      } finally {
-        setLoading(false)
+  const loadDashboardData = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
       }
-    }
 
+      // 1. Fetch User Profile Safely
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (userProfile) setProfile(userProfile)
+
+      // 2. Fetch Active Workshop Session Safely
+      const { data: activeSession } = await supabase
+        .from('sessions')
+        .select('*')
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      
+      if (activeSession) {
+        setSession(activeSession)
+        
+        // Check if student is already checked in to the active session
+        const { data: checkInRecord } = await supabase
+          .from('check_ins')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('session_id', activeSession.id)
+          .maybeSingle()
+          
+        if (checkInRecord) setHasCheckedIn(true)
+      }
+
+      // 3. Fetch Attendance History safely
+      const { data: historyData } = await supabase
+        .from('check_ins')
+        .select(`
+          id,
+          checked_in_at,
+          sessions ( title, location )
+        `)
+        .eq('user_id', user.id)
+        .order('checked_in_at', { ascending: false })
+
+      if (historyData) setHistory(historyData as unknown as CheckInHistory[])
+    } catch (error) {
+      console.error("Dashboard sync error:", error)
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     loadDashboardData()
+
+    // Real-time listener: Instantly update session data if Admin publishes the link
+    const channel = supabase.channel('student_session_stream')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'sessions' },
+        (payload) => {
+          setSession((prev) => prev?.id === payload.new.id ? { ...prev, ...payload.new } : prev)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [router, supabase])
+
+  const handleOnlineJoin = async () => {
+    if (!session?.meeting_link) return
+    setIsJoining(true)
+
+    try {
+      if (!hasCheckedIn) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Securely log attendance in database
+          await supabase.from('check_ins').insert({
+            user_id: user.id,
+            session_id: session.id
+          })
+          setHasCheckedIn(true)
+          // Refresh history silently
+          loadDashboardData(false)
+        }
+      }
+      // Route user to the meeting in a new tab
+      window.open(session.meeting_link, '_blank')
+    } catch (error) {
+      console.error("Failed to process online check-in", error)
+    } finally {
+      setIsJoining(false)
+    }
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -233,39 +279,77 @@ export default function Dashboard() {
                   </div>
 
                   {/* Right Content: Action Panel */}
-                  <div className="w-full sm:w-56 flex-shrink-0 flex flex-col h-full pt-4 sm:pt-0">
-                    <div className={`p-6 border-2 rounded-sm flex flex-col justify-center items-center text-center mb-4 ${hasCheckedIn ? 'bg-green-50 border-green-200' : 'bg-white border-amber-200 shadow-sm'}`}>
+                  <div className="w-full sm:w-64 flex-shrink-0 flex flex-col h-full pt-4 sm:pt-0">
+                    <div className={`p-5 border-2 rounded-sm flex flex-col justify-center items-center text-center mb-6 ${hasCheckedIn ? 'bg-green-50 border-green-200' : 'bg-white border-amber-200 shadow-sm'}`}>
                       <h4 className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-3">Status</h4>
                       {hasCheckedIn ? (
                         <div className="flex flex-col items-center gap-2 text-green-700 font-bold text-sm">
-                          <CheckCircle2 className="w-10 h-10 text-green-500" />
-                          Attendance Logged
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
+                          Check-in Successful
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2 text-amber-600 font-bold text-sm">
-                          <AlertCircle className="w-10 h-10 text-amber-500" />
+                          <AlertCircle className="w-8 h-8 text-amber-500" />
                           Pending Check-in
                         </div>
                       )}
                     </div>
 
-                    <div className="flex flex-col justify-end flex-grow">
+                    <div className="flex flex-col justify-end flex-grow gap-4">
                       {hasCheckedIn ? (
-                        <div className="w-full bg-green-600/10 text-green-700 font-bold text-xs px-4 py-3 rounded-sm border border-green-200 text-center">
-                          Your cryptographic credential is secure in the database.
-                        </div>
+                        <>
+                          <div className="w-full bg-green-600/10 text-green-700 font-bold text-xs px-4 py-3 rounded-sm border border-green-200 text-center">
+                            Your cryptographic credential is secure in the database.
+                          </div>
+                          
+                          {/* Re-join button if they are checked in but still need access */}
+                          {session.is_online_enabled && session.meeting_link && (
+                            <button 
+                              onClick={handleOnlineJoin}
+                              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-bold text-xs px-6 py-3 rounded-sm border border-blue-200 flex items-center justify-center gap-2 shadow-sm mt-4"
+                            >
+                              <Video className="w-4 h-4" />
+                              Re-join Meeting
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <Link 
                             href="/dashboard/scan"
-                            className="w-full bg-primary hover:bg-foreground transition-colors text-white font-bold text-sm px-6 py-4 rounded-sm shadow-md flex items-center justify-center gap-2 group"
+                            className="w-full bg-primary hover:bg-foreground transition-colors text-white font-bold text-sm px-6 py-3.5 rounded-sm shadow-md flex items-center justify-center gap-2 group"
                           >
                             <QrCode className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                            Mark Attendance
+                            Scan QR Code
                           </Link>
-                          <p className="text-[10px] text-center text-secondary font-medium mt-3 px-2">
-                            Scanning generates your cryptographic workshop credential.
-                          </p>
+                          
+                          {/* Online Attendance Notice Panel - Enhanced */}
+                          <div className="w-full bg-blue-50/80 border border-blue-200 rounded-sm p-5 text-center shadow-sm relative overflow-hidden mt-2">
+                            <h4 className="text-sm font-bold text-blue-900 mb-2 flex items-center justify-center gap-2">
+                              <Wifi className="w-4 h-4 text-blue-600" /> Want to Attend Online?
+                            </h4>
+                            
+                            {session.is_online_enabled && session.meeting_link ? (
+                              <>
+                                <p className="text-xs text-blue-800/80 mb-4 leading-tight">Virtual check-in is now open.</p>
+                                <button 
+                                  onClick={handleOnlineJoin}
+                                  disabled={isJoining}
+                                  className="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-bold text-sm px-4 py-3 rounded-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  {isJoining ? 'Logging...' : 'Join Here!'}
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-xs text-blue-800/80 mb-4 leading-tight">The meeting link has not been published yet.</p>
+                                <span className="inline-block bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm border border-blue-200">
+                                  Waiting for Admin
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>

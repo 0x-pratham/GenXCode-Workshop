@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Activity, Users, QrCode, LogOut, ArrowRightLeft, ShieldCheck, User } from 'lucide-react'
+import { Activity, Users, QrCode, LogOut, ArrowRightLeft, ShieldCheck, User, Link as LinkIcon, Video, Lock, Unlock } from 'lucide-react'
 
 type CheckInRecord = {
   id: string
@@ -24,6 +24,8 @@ type Session = {
   id: string
   title: string
   qr_payload: string
+  meeting_link?: string
+  is_online_enabled?: boolean
 }
 
 export default function AdminDashboard() {
@@ -35,6 +37,8 @@ export default function AdminDashboard() {
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isUpdatingSession, setIsUpdatingSession] = useState(false)
+  const [meetingLinkInput, setMeetingLinkInput] = useState('')
   
   const supabase = createClient()
   const router = useRouter()
@@ -79,11 +83,14 @@ export default function AdminDashboard() {
 
       const { data: sessionData } = await supabase
         .from('sessions')
-        .select('id, title, qr_payload')
+        .select('id, title, qr_payload, meeting_link, is_online_enabled')
         .limit(1)
         .maybeSingle()
 
-      if (sessionData) setActiveSession(sessionData)
+      if (sessionData) {
+        setActiveSession(sessionData)
+        if (sessionData.meeting_link) setMeetingLinkInput(sessionData.meeting_link)
+      }
 
       if (showLoadingIndicator) setLoading(false)
     }
@@ -97,7 +104,6 @@ export default function AdminDashboard() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'check_ins' },
         () => {
-          // Silently fetch new data without triggering the loading skeleton
           fetchAdminData(false)
         }
       )
@@ -131,6 +137,29 @@ export default function AdminDashboard() {
       alert("Failed to update role.")
       setUsers(users.map(u => u.id === userId ? { ...u, role: currentRole } : u))
     }
+  }
+
+  const updateSessionOnlineAccess = async (isEnabled: boolean) => {
+    if (!activeSession) return
+    setIsUpdatingSession(true)
+
+    const payload = {
+      is_online_enabled: isEnabled,
+      meeting_link: meetingLinkInput.trim()
+    }
+
+    const { error } = await supabase
+      .from('sessions')
+      .update(payload)
+      .eq('id', activeSession.id)
+
+    if (!error) {
+      setActiveSession({ ...activeSession, ...payload })
+    } else {
+      alert("Failed to update session online access.")
+    }
+    
+    setIsUpdatingSession(false)
   }
 
   const handleLogout = async () => {
@@ -239,7 +268,7 @@ export default function AdminDashboard() {
                 : 'text-secondary hover:text-foreground hover:bg-white/50'
             }`}
           >
-            <QrCode className="w-4 h-4" /> QR Display
+            <QrCode className="w-4 h-4" /> Projection & Meeting
           </button>
         </div>
 
@@ -367,32 +396,105 @@ export default function AdminDashboard() {
           </section>
         )}
 
-        {/* TAB: QR DISPLAY */}
+        {/* TAB: PROJECTION & MEETING */}
         {activeTab === 'projection' && (
-          <section className="bg-white border border-border rounded-sm shadow-sm flex flex-col items-center justify-center p-12 min-h-[500px]">
-            {activeSession ? (
-              <div className="text-center w-full max-w-md">
-                <h2 className="text-2xl font-bold text-foreground mb-2">Scan to Check-in</h2>
-                <p className="text-sm text-secondary font-medium mb-10">{activeSession.title}</p>
-                
-                <div className="bg-white p-5 border-2 border-border rounded-sm shadow-md inline-block mx-auto mb-6">
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(activeSession.qr_payload)}&color=000000&bgcolor=FFFFFF&margin=0`} 
-                    alt="Session QR Code" 
-                    className="w-64 h-64 object-contain"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Left: Universal QR Projection */}
+            <section className="bg-white border border-border rounded-sm shadow-sm flex flex-col items-center justify-center p-8 min-h-[450px]">
+              {activeSession ? (
+                <div className="text-center w-full max-w-sm">
+                  <h2 className="text-2xl font-bold text-foreground mb-1">Scan to Check-in</h2>
+                  <p className="text-sm text-secondary font-medium mb-8">{activeSession.title}</p>
+                  
+                  <div className="bg-white p-4 border-2 border-border rounded-sm shadow-md inline-block mx-auto mb-6">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(activeSession.qr_payload)}&color=000000&bgcolor=FFFFFF&margin=0`} 
+                      alt="Session QR Code" 
+                      className="w-56 h-56 object-contain"
+                    />
+                  </div>
+                  
+                  <p className="text-xs font-mono font-medium text-secondary">
+                    Data: {activeSession.qr_payload}
+                  </p>
                 </div>
-                
-                <p className="text-xs font-mono font-medium text-secondary">
-                  Data: {activeSession.qr_payload}
-                </p>
-              </div>
-            ) : (
-              <div className="text-center text-secondary">
-                <p className="text-sm font-medium">No active session available to display.</p>
-              </div>
-            )}
-          </section>
+              ) : (
+                <div className="text-center text-secondary">
+                  <p className="text-sm font-medium">No active session available to display.</p>
+                </div>
+              )}
+            </section>
+
+            {/* Right: Online Meeting Control Panel */}
+            <section className="bg-white border border-border rounded-sm shadow-sm p-8 flex flex-col h-full">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2 mb-1">
+                <Video className="w-5 h-5 text-blue-500" /> Meeting Control
+              </h3>
+              <p className="text-sm text-secondary font-medium mb-8 border-b border-border pb-4">
+                Publish a meeting link to allow remote students to check-in virtually.
+              </p>
+
+              {activeSession ? (
+                <div className="flex flex-col flex-grow">
+                  
+                  {/* Link Input Box */}
+                  <div className="mb-6">
+                    <label className="block text-xs font-bold text-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      <LinkIcon className="w-3.5 h-3.5 text-secondary" /> Virtual Meeting URL
+                    </label>
+                    <input 
+                      type="url" 
+                      value={meetingLinkInput}
+                      onChange={(e) => setMeetingLinkInput(e.target.value)}
+                      placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                      className="w-full px-4 py-3 bg-gray-50 border border-border rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-mono"
+                    />
+                  </div>
+
+                  {/* Toggle Controls */}
+                  <div className="mt-auto space-y-3">
+                    <div className={`p-4 border rounded-sm shadow-sm flex items-center justify-between mb-4 ${activeSession.is_online_enabled ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-border'}`}>
+                      <div>
+                        <p className={`text-sm font-bold ${activeSession.is_online_enabled ? 'text-green-800' : 'text-foreground'}`}>
+                          {activeSession.is_online_enabled ? 'Online Access is LIVE' : 'Online Access is Locked'}
+                        </p>
+                        <p className={`text-xs mt-0.5 ${activeSession.is_online_enabled ? 'text-green-600' : 'text-secondary'}`}>
+                          {activeSession.is_online_enabled ? 'Students can currently join and check-in remotely.' : 'Students cannot see the meeting link.'}
+                        </p>
+                      </div>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${activeSession.is_online_enabled ? 'bg-green-100 border-green-200 text-green-600' : 'bg-gray-200 border-border text-secondary'}`}>
+                        {activeSession.is_online_enabled ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => updateSessionOnlineAccess(false)}
+                        disabled={isUpdatingSession || !activeSession.is_online_enabled}
+                        className="w-full bg-white border border-border hover:bg-gray-50 text-secondary hover:text-foreground font-bold text-sm px-4 py-3 rounded-sm shadow-sm transition-all disabled:opacity-50"
+                      >
+                        Lock Access
+                      </button>
+                      <button 
+                        onClick={() => updateSessionOnlineAccess(true)}
+                        disabled={isUpdatingSession || !meetingLinkInput || activeSession.is_online_enabled}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-4 py-3 rounded-sm shadow-sm transition-all disabled:opacity-50 disabled:bg-blue-400"
+                      >
+                        Publish Link
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <div className="flex-grow flex items-center justify-center text-center">
+                  <p className="text-sm text-secondary font-medium">Create a session first to enable online controls.</p>
+                </div>
+              )}
+            </section>
+
+          </div>
         )}
 
       </main>
