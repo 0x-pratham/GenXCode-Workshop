@@ -202,7 +202,7 @@ export default function Dashboard() {
                       </span>
                       <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-sm border border-blue-100 shadow-sm text-purple-600">
                         <Clock className="w-4 h-4" /> 
-                        {new Date(session.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(session.start_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     
@@ -340,7 +340,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="text-[9px] sm:text-[10px] font-mono font-bold text-primary bg-primary/5 border border-primary/20 px-2 py-1 inline-block rounded-sm">
-                          LOGGED: {new Date(record.checked_in_at).toLocaleDateString()} @ {new Date(record.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          LOGGED: {new Date(record.checked_in_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })} @ {new Date(record.checked_in_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </li>
                     ))}
