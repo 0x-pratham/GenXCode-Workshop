@@ -70,7 +70,7 @@ export default function Dashboard() {
         .maybeSingle()
       
       if (activeSession) {
-        setSession(activeSession)
+        setSession(activeSession as Session)
         
         // Check if student is already checked in to the active session
         const { data: checkInRecord } = await supabase
@@ -111,7 +111,12 @@ export default function Dashboard() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'sessions' },
         (payload) => {
-          setSession((prev) => prev?.id === payload.new.id ? { ...prev, ...payload.new } : prev)
+          setSession((prev) => {
+            if (prev && prev.id === payload.new.id) {
+              return { ...prev, ...payload.new } as Session
+            }
+            return prev
+          })
         }
       )
       .subscribe()
