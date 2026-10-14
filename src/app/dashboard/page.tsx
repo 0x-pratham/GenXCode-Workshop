@@ -306,9 +306,9 @@ export default function Dashboard() {
                           {session.is_online_enabled && session.meeting_link && (
                             <button 
                               onClick={handleOnlineJoin}
-                              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-bold text-xs px-6 py-3 rounded-sm border border-blue-200 flex items-center justify-center gap-2 shadow-sm mt-4"
+                              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-bold text-xs px-6 py-4 rounded-sm border border-blue-200 flex items-center justify-center gap-2 shadow-sm mt-2"
                             >
-                              <Video className="w-4 h-4" />
+                              <Video className="w-5 h-5" />
                               Re-join Meeting
                             </button>
                           )}
@@ -317,34 +317,36 @@ export default function Dashboard() {
                         <>
                           <Link 
                             href="/dashboard/scan"
-                            className="w-full bg-primary hover:bg-foreground transition-colors text-white font-bold text-sm px-6 py-3.5 rounded-sm shadow-md flex items-center justify-center gap-2 group"
+                            className="w-full bg-primary hover:bg-foreground transition-colors text-white font-bold text-sm px-6 py-4 rounded-sm shadow-md flex items-center justify-center gap-2 group"
                           >
-                            <QrCode className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                            <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform" />
                             Scan QR Code
                           </Link>
                           
-                          {/* Online Attendance Notice Panel - Enhanced */}
-                          <div className="w-full bg-blue-50/80 border border-blue-200 rounded-sm p-5 text-center shadow-sm relative overflow-hidden mt-2">
-                            <h4 className="text-sm font-bold text-blue-900 mb-2 flex items-center justify-center gap-2">
-                              <Wifi className="w-4 h-4 text-blue-600" /> Want to Attend Online?
+                          {/* Online Attendance Notice Panel - Enlarged & Polished */}
+                          <div className="w-full bg-blue-50/50 border-2 border-blue-100 rounded-sm p-6 sm:p-8 text-center shadow-sm relative overflow-hidden mt-2 group">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            
+                            <h4 className="text-base sm:text-lg font-bold text-blue-900 mb-3 flex items-center justify-center gap-2">
+                              <Wifi className="w-5 h-5 text-blue-600" /> Want to Attend Online?
                             </h4>
                             
                             {session.is_online_enabled && session.meeting_link ? (
                               <>
-                                <p className="text-xs text-blue-800/80 mb-4 leading-tight">Virtual check-in is now open.</p>
+                                <p className="text-xs sm:text-sm text-blue-800/80 mb-6 leading-relaxed font-medium">Virtual check-in is now open. Clicking the button will securely log your attendance.</p>
                                 <button 
                                   onClick={handleOnlineJoin}
                                   disabled={isJoining}
-                                  className="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-bold text-sm px-4 py-3 rounded-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                  className="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-bold text-sm sm:text-base px-6 py-4 rounded-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
-                                  <Video className="w-4 h-4" />
+                                  <Video className="w-5 h-5" />
                                   {isJoining ? 'Logging...' : 'Join Here!'}
                                 </button>
                               </>
                             ) : (
                               <>
-                                <p className="text-xs text-blue-800/80 mb-4 leading-tight">The meeting link has not been published yet.</p>
-                                <span className="inline-block bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm border border-blue-200">
+                                <p className="text-xs sm:text-sm text-blue-800/80 mb-6 leading-relaxed font-medium">The virtual meeting link has not been published by the administrator yet.</p>
+                                <span className="inline-block bg-blue-100/80 text-blue-700 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-sm border border-blue-200">
                                   Waiting for Admin
                                 </span>
                               </>
