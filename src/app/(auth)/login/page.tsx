@@ -253,7 +253,7 @@ export default function AuthPage() {
                     className="flex h-10 sm:h-11 w-full rounded-sm border-2 border-border bg-white/50 pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary transition-colors"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="student@jspm.edu.in"
+                    placeholder="yourmail@gmail.com"
                   />
                 </div>
               </div>
