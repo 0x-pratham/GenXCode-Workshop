@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -16,6 +16,7 @@ export default function AuthPage() {
   const [phone, setPhone] = useState('')
   
   const [showPassword, setShowPassword] = useState(false)
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false)
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,9 +24,60 @@ export default function AuthPage() {
   
   const router = useRouter()
   const supabase = createClient()
+  const isLoginRef = useRef(isLogin)
+
+  // Keep ref in sync for the interval
+  useEffect(() => {
+    isLoginRef.current = isLogin
+  }, [isLogin])
+
+  // Real-time IST deadline checker
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date()
+      
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+      
+      const parts = formatter.formatToParts(now)
+      const year = parts.find(p => p.type === 'year')?.value
+      const month = parts.find(p => p.type === 'month')?.value
+      const day = parts.find(p => p.type === 'day')?.value
+      
+      // Target: Today's date in IST at exactly 20:00:00 (8:00 PM) +05:30 offset
+      const targetTime = new Date(`${year}-${month}-${day}T20:00:00+05:30`)
+      const diff = Math.floor((targetTime.getTime() - now.getTime()) / 1000)
+      
+      if (diff <= 0) {
+        setIsRegistrationClosed(true)
+        // If they are on the registration tab when time runs out, kick them back to login
+        if (!isLoginRef.current) {
+          setIsLogin(true)
+          setError("Registrations have officially closed. You can only log in now.")
+        }
+      } else {
+        setIsRegistrationClosed(false)
+      }
+    }
+
+    checkTime()
+    const timer = setInterval(checkTime, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Hard block registration if time is up
+    if (!isLogin && isRegistrationClosed) {
+      setError("Registrations are closed. Access denied.")
+      return
+    }
+
     setLoading(true)
     setError(null)
     setSuccess(null)
@@ -73,7 +125,6 @@ export default function AuthPage() {
         }
       }
     } catch (err) {
-      // Fixed TypeScript Error here (Removed 'any')
       setError((err as Error).message || 'An unexpected error occurred.')
     } finally {
       if (!success) setLoading(false)
@@ -178,7 +229,7 @@ export default function AuthPage() {
             <form onSubmit={handleAuth} className="space-y-3 sm:space-y-4">
               
               {/* Registration Specific Fields */}
-              {!isLogin && (
+              {!isLogin && !isRegistrationClosed && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -242,7 +293,7 @@ export default function AuthPage() {
                 </>
               )}
 
-              {/* Shared Fields */}
+              {/* Shared Fields (Always shown for Login) */}
               <div className="space-y-1">
                 <label className="text-[10px] sm:text-xs font-bold text-secondary uppercase tracking-wider">Email Address</label>
                 <div className="relative">
@@ -316,21 +367,27 @@ export default function AuthPage() {
             </form>
 
             <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-border text-center">
-              <p className="text-xs sm:text-sm text-secondary">
-                {isLogin ? "Don't have an account? " : "Already registered? "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsLogin(!isLogin)
-                    setError(null)
-                    setSuccess(null)
-                    setShowPassword(false) // Reset password visibility on toggle
-                  }}
-                  className="font-bold text-primary hover:underline hover:text-foreground transition-colors ml-1"
-                >
-                  {isLogin ? 'Register here' : 'Sign in'}
-                </button>
-              </p>
+              {isRegistrationClosed ? (
+                <p className="text-xs sm:text-sm text-red-600 font-bold tracking-wide uppercase">
+                  Registrations are closed.
+                </p>
+              ) : (
+                <p className="text-xs sm:text-sm text-secondary">
+                  {isLogin ? "Don't have an account? " : "Already registered? "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLogin(!isLogin)
+                      setError(null)
+                      setSuccess(null)
+                      setShowPassword(false) // Reset password visibility on toggle
+                    }}
+                    className="font-bold text-primary hover:underline hover:text-foreground transition-colors ml-1"
+                  >
+                    {isLogin ? 'Register here' : 'Sign in'}
+                  </button>
+                </p>
+              )}
             </div>
             
           </div>

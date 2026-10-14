@@ -1,10 +1,125 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { LayoutTemplate, Server, ShieldCheck, ExternalLink, Heart } from 'lucide-react'
+import { LayoutTemplate, Server, ShieldCheck, ExternalLink, Heart, AlertTriangle, X, Clock as ClockIcon } from 'lucide-react'
 
 export default function LandingPage() {
+  const [mounted, setMounted] = useState(false)
+  const [showPopup, setShowPopup] = useState(true)
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [isClosed, setIsClosed] = useState(false)
+
+  // Calculate time remaining until 8:00 PM IST today
+  useEffect(() => {
+    setMounted(true)
+    
+    const updateTimer = () => {
+      const now = new Date()
+      
+      // Force calculation strictly in Indian Standard Time (IST)
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+      
+      const parts = formatter.formatToParts(now)
+      const year = parts.find(p => p.type === 'year')?.value
+      const month = parts.find(p => p.type === 'month')?.value
+      const day = parts.find(p => p.type === 'day')?.value
+      
+      // Target: Today's date in IST at exactly 20:00:00 (8:00 PM) +05:30 timezone offset
+      const targetTime = new Date(`${year}-${month}-${day}T20:00:00+05:30`)
+      const diff = Math.floor((targetTime.getTime() - now.getTime()) / 1000)
+      
+      if (diff <= 0) {
+        setTimeLeft(0)
+        setIsClosed(true)
+        setShowPopup(false) // Auto-hide popup when 8:00 PM hits
+      } else {
+        setTimeLeft(diff)
+        setIsClosed(false)
+      }
+    }
+
+    // Initial run and exact 1-second intervals
+    updateTimer()
+    const timer = setInterval(updateTimer, 1000)
+    
+    return () => clearInterval(timer)
+  }, [])
+
+  // Natural time format
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    
+    if (h > 0) {
+      return `${h.toString().padStart(2, '0')} : ${m.toString().padStart(2, '0')} : ${s.toString().padStart(2, '0')}`
+    }
+    return `${m.toString().padStart(2, '0')} : ${s.toString().padStart(2, '0')}`
+  }
+
   return (
     <div className="min-h-screen flex flex-col selection:bg-primary/20 selection:text-primary relative overflow-hidden w-full max-w-[100vw]">
       
+      {/* Blinking Red Countdown Popup - Minimal & Clean */}
+      {mounted && showPopup && !isClosed && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden relative animate-in fade-in zoom-in duration-300">
+            {/* Top Red Bar */}
+            <div className="h-1.5 w-full bg-red-600 animate-pulse"></div>
+            
+            <button 
+              onClick={() => setShowPopup(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-red-600 transition-colors z-10 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-8 text-center flex flex-col items-center">
+              
+              <h2 className="text-xl sm:text-2xl font-black text-red-600 mb-1 uppercase tracking-tight leading-tight">
+                Registrations Closing
+              </h2>
+              
+              <p className="text-xs text-secondary font-medium mb-6 uppercase tracking-widest">
+                Secure your spot now
+              </p>
+              
+              {/* Natural, Minimal Font for Better Visibility */}
+              <div className="text-5xl sm:text-6xl font-sans font-bold text-red-600 mb-8 tracking-tighter">
+                {formatTime(timeLeft)}
+              </div>
+              
+              <Link 
+                href="/login" 
+                onClick={() => setShowPopup(false)}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-sm shadow-sm transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2"
+              >
+                Register
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Countdown Pill (Shows only when main popup is closed & time remains) */}
+      {mounted && !showPopup && !isClosed && (
+        <Link 
+          href="/login"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-5 sm:px-6 py-3 rounded-full shadow-2xl flex items-center justify-center gap-3 animate-pulse border-2 border-red-400 w-[90%] sm:w-auto max-w-sm hover:bg-red-700 transition-colors"
+        >
+          <ClockIcon className="w-5 h-5 animate-bounce" />
+          <span className="font-bold text-sm sm:text-base uppercase tracking-widest whitespace-nowrap">
+            Closing In: {formatTime(timeLeft)}
+          </span>
+        </Link>
+      )}
+
       {/* Engineered Grid Background */}
       <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-40"></div>
 
@@ -32,9 +147,9 @@ export default function LandingPage() {
         
         {/* Left Column: Typography & CTAs */}
         <div className="flex flex-col items-center md:items-start text-center md:text-left w-full relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-primary/30 bg-primary/5 text-primary text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-6 md:mb-8 shadow-sm backdrop-blur-sm">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            Live Workshop Registration
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border ${!isClosed ? 'border-primary/30 bg-primary/5 text-primary' : 'border-red-300 bg-red-50 text-red-600'} text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-6 md:mb-8 shadow-sm backdrop-blur-sm`}>
+            <span className={`w-2 h-2 rounded-full ${!isClosed ? 'bg-primary animate-pulse' : 'bg-red-500'}`}></span>
+            {!isClosed ? 'Live Workshop Registration' : 'Registrations Closed'}
           </div>
           
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-4 md:mb-6 text-foreground leading-[1.15] tracking-tight">
@@ -48,12 +163,21 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link 
-              href="/login" 
-              className="inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-sm text-base md:text-lg font-semibold hover:bg-foreground hover:text-white transition-colors shadow-md w-full sm:w-auto"
-            >
-              Access Workshop Portal
-            </Link>
+            {(!mounted || !isClosed) ? (
+              <Link 
+                href="/login" 
+                className="inline-flex items-center justify-center px-8 py-4 bg-primary text-primary-foreground rounded-sm text-base md:text-lg font-semibold hover:bg-foreground hover:text-white transition-colors shadow-md w-full sm:w-auto"
+              >
+                Access Workshop Portal
+              </Link>
+            ) : (
+              <button 
+                disabled 
+                className="inline-flex items-center justify-center px-8 py-4 bg-gray-200 text-gray-500 border border-gray-300 rounded-sm text-base md:text-lg font-bold w-full sm:w-auto cursor-not-allowed opacity-80 uppercase tracking-wider"
+              >
+                Registrations Closed
+              </button>
+            )}
           </div>
         </div>
 
